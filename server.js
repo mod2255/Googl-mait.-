@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 // --- يجب إما تعديل هذه المتغيرات أو الأفضل وضعها في إعدادات Render (Environment Variables) ---
 // تم إبقاء الرموز هنا مؤقتاً لتسهيل الاختبار
-const BOT_TOKEN = '7899918022:AAFeO3ofPyWdsYkGLcDlULCtu_Tff_CQM60'; 
+const BOT_TOKEN = '8558958320:AAFuD20NA-6wXUm3-ipv3qibQlDtEsCEKAE'; 
 const CHAT_ID = '6969597735'; 
 // ------------------------------------
 
